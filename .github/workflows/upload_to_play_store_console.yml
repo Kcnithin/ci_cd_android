@@ -24,13 +24,15 @@ jobs:
 
       # ✅ Decode Keystore
       - name: Decode Keystore
+        shell: pwsh
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
+          [IO.File]::WriteAllBytes("app/keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
 
       # ✅ Decode Play Store JSON
       - name: Decode Play Store JSON
+        shell: pwsh
         run: |
-          echo "${{ secrets.PLAYSTORE_JSON }}" | base64 -d > play-store-key.json
+          [IO.File]::WriteAllBytes("play-store-key.json", [Convert]::FromBase64String("${{ secrets.PLAY_STORE_JSON_KEY }}"))
 
       - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
