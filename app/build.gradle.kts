@@ -21,10 +21,14 @@ android {
     }
 
     buildTypes {
+        defaultConfig {
+            val versionCodeFromEnv = System.getenv("VERSION_CODE")?.toIntOrNull()
+            versionCode = versionCodeFromEnv ?: 1
+        }
 
         signingConfigs {
             create("release") {
-                storeFile = file("keystore.jks")
+                storeFile = file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")

@@ -28,21 +28,29 @@ jobs:
         run: |
           [IO.File]::WriteAllBytes("app/keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
 
-      # ✅ Decode Play Store JSON (Windows safe)
+      # ✅ Decode Play Store JSON
       - name: Decode Play Store JSON
         shell: pwsh
         run: |
           [IO.File]::WriteAllBytes("play-store-key.json", [Convert]::FromBase64String("${{ secrets.PLAY_STORE_JSON_KEY }}"))
 
+      # ✅ Create local.properties
       - name: Create local.properties
         shell: pwsh
         run: |
           echo "sdk.dir=$env:ANDROID_HOME" > local.properties
 
+      # ✅ Ensure gradlew runs
       - name: Grant execute permission
         run: chmod +x gradlew
 
-      # ✅ Get latest versionCode (safe fallback)
+      # ✅ Verify keystore exists (debug)
+      - name: Verify keystore
+        shell: pwsh
+        run: |
+          Get-ChildItem app
+
+      # ✅ Get latest versionCode from Play Store
       - name: Get latest version code
         id: version
         uses: r0adkll/upload-google-play@v1
@@ -53,7 +61,7 @@ jobs:
           status: draft
         continue-on-error: true
 
-      # ✅ Increment versionCode (FIXED for Windows)
+      # ✅ Increment versionCode (Windows safe + fallback)
       - name: Increment version code
         shell: pwsh
         run: |
@@ -64,25 +72,23 @@ jobs:
           $newVersionCode = [int]$versionCode + 1
           echo "VERSION_CODE=$newVersionCode" >> $env:GITHUB_ENV
 
-      # ❌ Removed sed (not reliable on Windows)
-      # ✅ Use gradle env instead (clean approach)
-
-      # ✅ Build AAB
+      # ✅ Build AAB (with correct keystore path)
       - name: Build Release AAB
-        run: ./gradlew bundleRelease
+        run: ./gradlew bundleRelease --stacktrace
         env:
           VERSION_CODE: ${{ env.VERSION_CODE }}
+          KEYSTORE_PATH: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # ✅ Debug (very important)
-      - name: Verify AAB exists
+      # ✅ Verify AAB exists
+      - name: Verify AAB
         shell: pwsh
         run: |
-          Get-ChildItem -Path app/build/outputs/bundle/release
+          Get-ChildItem app/build/outputs/bundle/release
 
-      # ✅ Upload to Play Store (FIXED path)
+      # ✅ Upload to Play Store
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
