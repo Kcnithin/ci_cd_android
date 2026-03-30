@@ -1,7 +1,7 @@
 name: Android CI/CD
 
 on:
-  workflow_dispatch:   # ✅ enables manual trigger with branch selection
+  workflow_dispatch:
     inputs:
       track:
         description: "Play Store Track"
@@ -22,25 +22,27 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
-      # ✅ Decode Keystore
+      # ✅ Decode Keystore (Windows safe)
       - name: Decode Keystore
         shell: pwsh
         run: |
           [IO.File]::WriteAllBytes("app/keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
 
-      # ✅ Decode Play Store JSON
+      # ✅ Decode Play Store JSON (Windows safe)
       - name: Decode Play Store JSON
         shell: pwsh
         run: |
           [IO.File]::WriteAllBytes("play-store-key.json", [Convert]::FromBase64String("${{ secrets.PLAY_STORE_JSON_KEY }}"))
 
       - name: Create local.properties
-        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+        shell: pwsh
+        run: |
+          echo "sdk.dir=$env:ANDROID_HOME" > local.properties
 
       - name: Grant execute permission
         run: chmod +x gradlew
 
-      # ✅ Get latest versionCode from Play Store
+      # ✅ Get latest versionCode (safe fallback)
       - name: Get latest version code
         id: version
         uses: r0adkll/upload-google-play@v1
@@ -51,32 +53,41 @@ jobs:
           status: draft
         continue-on-error: true
 
-      # ✅ Generate next versionCode
+      # ✅ Increment versionCode (FIXED for Windows)
       - name: Increment version code
-        id: increment
+        shell: pwsh
         run: |
-          VERSION_CODE=$((${{ steps.version.outputs.versionCode }} + 1))
-          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          $versionCode = "${{ steps.version.outputs.versionCode }}"
+          if (-not $versionCode) {
+            $versionCode = 1
+          }
+          $newVersionCode = [int]$versionCode + 1
+          echo "VERSION_CODE=$newVersionCode" >> $env:GITHUB_ENV
 
-      # ✅ Update versionCode in gradle
-      - name: Update versionCode
-        run: |
-          sed -i "s/versionCode [0-9]\+/versionCode $VERSION_CODE/" app/build.gradle
+      # ❌ Removed sed (not reliable on Windows)
+      # ✅ Use gradle env instead (clean approach)
 
       # ✅ Build AAB
       - name: Build Release AAB
         run: ./gradlew bundleRelease
         env:
+          VERSION_CODE: ${{ env.VERSION_CODE }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # ✅ Upload to Play Store
+      # ✅ Debug (very important)
+      - name: Verify AAB exists
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path app/build/outputs/bundle/release
+
+      # ✅ Upload to Play Store (FIXED path)
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJson: play-store-key.json
           packageName: com.cicd.seeroo_sample
-          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          releaseFiles: app/build/outputs/bundle/release/*.aab
           track: ${{ github.event.inputs.track }}
           status: completed
