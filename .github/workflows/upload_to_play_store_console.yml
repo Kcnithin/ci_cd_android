@@ -7,6 +7,10 @@ on:
         description: "Play Store Track"
         required: true
         default: "internal"
+      version_code:
+        description: "App Version Code"
+        required: true
+        default: "1"
 
 jobs:
   build:
@@ -98,7 +102,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          VERSION_CODE: ${{ 3 }}
+          VERSION_CODE: ${{ github.event.inputs.version_code }}
 
       # ----------------------------------------------
       # Verify AAB Output
