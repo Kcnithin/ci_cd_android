@@ -13,6 +13,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -34,8 +35,8 @@ jobs:
       - name: Decode Keystore
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path android/app
-          [IO.File]::WriteAllBytes("android/app/keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
+          New-Item -ItemType Directory -Force -Path keystores
+          [IO.File]::WriteAllBytes("keystores/cicd-keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
 
       - name: Decode Play Store JSON
         shell: pwsh
@@ -48,23 +49,13 @@ jobs:
           $sdkPath = $env:ANDROID_SDK_ROOT -replace '\\', '/'
           echo "sdk.dir=$sdkPath" > local.properties
 
-      - name: Set version code
-        shell: pwsh
-        run: |
-          echo "VERSION_CODE=2" >> $env:GITHUB_ENV
-
-      # ✅ Clean (FINAL FIX)
       - name: Clean
-        working-directory: android
         run: .\gradlew.bat clean
 
-      # ✅ Build (FINAL FIX)
       - name: Build Release AAB
-        working-directory: android
         run: .\gradlew.bat bundleRelease --stacktrace --debug
         env:
-          VERSION_CODE: ${{ env.VERSION_CODE }}
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/keystores/cicd-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -72,7 +63,7 @@ jobs:
       - name: Ensure AAB exists
         shell: pwsh
         run: |
-          $files = Get-ChildItem android/app/build -Recurse -Filter *.aab -ErrorAction SilentlyContinue
+          $files = Get-ChildItem app/build -Recurse -Filter *.aab -ErrorAction SilentlyContinue
           if (-not $files) {
             Write-Error "AAB not generated. Build failed."
             exit 1
@@ -85,6 +76,6 @@ jobs:
         with:
           serviceAccountJson: play-store-key.json
           packageName: com.cicd.seeroo_sample
-          releaseFiles: android/app/build/outputs/bundle/release/*.aab
+          releaseFiles: app/build/outputs/bundle/release/*.aab
           track: ${{ github.event.inputs.track }}
           status: completed
