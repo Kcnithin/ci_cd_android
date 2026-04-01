@@ -81,13 +81,19 @@ jobs:
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
       # -----------------------------
-      # 7. GRADLE CLEAN
+      # 7. MAKE gradlew EXECUTABLE
+      # -----------------------------
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # -----------------------------
+      # 8. GRADLE CLEAN
       # -----------------------------
       - name: Clean
         run: ./gradlew clean
 
       # -----------------------------
-      # 8. BUILD RELEASE AAB
+      # 9. BUILD RELEASE AAB
       # -----------------------------
       - name: Build Release AAB
         run: ./gradlew bundleRelease --stacktrace --debug
@@ -98,14 +104,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       # -----------------------------
-      # 9. VERIFY AAB EXISTS
+      # 10. VERIFY AAB EXISTS
       # -----------------------------
       - name: Ensure AAB exists
         run: |
+          echo "Generated AAB files:"
           ls -R app/build/outputs/bundle/release
 
       # -----------------------------
-      # 10. UPLOAD TO PLAY STORE
+      # 11. UPLOAD TO PLAY STORE
       # -----------------------------
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
