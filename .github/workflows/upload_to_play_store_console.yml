@@ -42,7 +42,7 @@ jobs:
           sdkmanager "build-tools;36.0.0"
 
       # ----------------------------------------------
-      # Decode Keystore
+      # Decode Keystore (correct location)
       # ----------------------------------------------
       - name: Decode Keystore
         run: |
@@ -57,7 +57,7 @@ jobs:
           echo "${{ secrets.PLAY_STORE_JSON_KEY }}" | base64 --decode > play-store-key.json
 
       # ----------------------------------------------
-      # Clean JSON (Fix CRLF, null bytes, formatting issues)
+      # Clean JSON
       # ----------------------------------------------
       - name: Clean Play Store JSON
         run: |
@@ -65,7 +65,7 @@ jobs:
           mv clean.json play-store-key.json
 
       # ----------------------------------------------
-      # Validate Play Store JSON Strictly
+      # Validate Play Store JSON
       # ----------------------------------------------
       - name: Validate Play Store JSON
         run: |
@@ -88,7 +88,7 @@ jobs:
       - name: Clean
         run: ./gradlew clean --stacktrace
         env:
-          KEYSTORE_PATH: app/keystores/cicd-keystore.jks
+          KEYSTORE_PATH: keystores/cicd-keystore.jks   # FIXED
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -96,7 +96,7 @@ jobs:
       - name: Build Release AAB
         run: ./gradlew bundleRelease --stacktrace --info
         env:
-          KEYSTORE_PATH: app/keystores/cicd-keystore.jks
+          KEYSTORE_PATH: keystores/cicd-keystore.jks   # FIXED
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -117,6 +117,6 @@ jobs:
         with:
           serviceAccountJson: ${{ github.workspace }}/play-store-key.json
           packageName: com.cicd.seeroo_sample
-          releaseFiles: app/build/outputs/bundle/release/**/*.aab
+          releaseFiles: app/build/outputs/bundle/release/**/*.aab   # FIXED
           track: ${{ github.event.inputs.track }}
           status: completed
