@@ -43,8 +43,8 @@ jobs:
       # Decode keystore
       - name: Decode Keystore
         run: |
-          mkdir -p keystores
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystores/cicd-keystore.jks
+          mkdir -p app/keystores
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystores/cicd-keystore.jks
 
       # Decode Play Store JSON
       - name: Decode Play Store JSON
