@@ -79,6 +79,7 @@ jobs:
 
           JSON_KEY="$GITHUB_WORKSPACE/play-store-key.json"
 
+          # Generate a JSON dump of all Google Play data
           fastlane supply \
             --package_name com.cicd.seeroo_sample \
             --json_key $JSON_KEY \
@@ -87,10 +88,11 @@ jobs:
             --skip_upload_screenshots \
             --skip_upload_apk \
             --skip_upload_aab \
-            --format json \
-            --print_current_version > supply_output.json
+            --json_output supply_output.json
 
-          # Extract ALL version codes from ALL tracks
+          echo "Dumped Play Store metadata to supply_output.json"
+
+          # Extract ALL version codes across ALL tracks
           VERSION_CODE=$(jq '[.. | .versionCodes? // empty] | flatten | max' supply_output.json)
 
           if [ -z "$VERSION_CODE" ] || [ "$VERSION_CODE" = "null" ]; then
@@ -103,7 +105,6 @@ jobs:
           echo "New versionCode for CI = $NEW_VERSION_CODE"
 
           echo "VERSION_CODE=$NEW_VERSION_CODE" >> $GITHUB_ENV
-
       # ----------------------------------------------
       # Gradle Setup
       # ----------------------------------------------
