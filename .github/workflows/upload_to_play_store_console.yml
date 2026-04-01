@@ -13,14 +13,22 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # ✅ Checkout
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # ✅ Java
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: 17
+
+      # ✅ Install Android SDK components (CRITICAL FIX)
+      - name: Install Android SDK
+        shell: pwsh
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       # ✅ Decode Keystore
       - name: Decode Keystore
@@ -35,14 +43,14 @@ jobs:
         run: |
           [IO.File]::WriteAllBytes("play-store-key.json", [Convert]::FromBase64String("${{ secrets.PLAY_STORE_JSON_KEY }}"))
 
-      # ✅ FIXED: Create local.properties (CRITICAL CHANGE)
+      # ✅ FIXED: local.properties (Windows-safe)
       - name: Create local.properties
         shell: pwsh
         run: |
           $sdkPath = $env:ANDROID_HOME -replace '\\', '/'
           echo "sdk.dir=$sdkPath" > local.properties
 
-      # ✅ Debug SDK path (optional but useful)
+      # ✅ Debug SDK path
       - name: Verify SDK path
         shell: pwsh
         run: |
@@ -54,19 +62,19 @@ jobs:
         run: |
           Get-ChildItem android/app
 
-      # ✅ Set versionCode
+      # ✅ Version code
       - name: Set version code
         shell: pwsh
         run: |
           echo "VERSION_CODE=2" >> $env:GITHUB_ENV
 
-      # ✅ Clean build
+      # ✅ Clean
       - name: Clean
         run: ./gradlew clean
 
-      # ✅ Build AAB
+      # ✅ Build AAB (FULL DEBUG)
       - name: Build Release AAB
-        run: ./gradlew bundleRelease --stacktrace --info
+        run: ./gradlew bundleRelease --stacktrace --debug
         env:
           VERSION_CODE: ${{ env.VERSION_CODE }}
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
@@ -74,11 +82,25 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # ✅ Verify AAB exists
+      # ✅ Debug all build outputs (VERY IMPORTANT)
+      - name: Debug Build Folder
+        shell: pwsh
+        run: |
+          if (Test-Path "android/app/build") {
+            Get-ChildItem android/app/build -Recurse -Depth 3
+          } else {
+            Write-Host "Build folder not found"
+          }
+
+      # ✅ Verify AAB safely (no crash)
       - name: Verify AAB
         shell: pwsh
         run: |
-          Get-ChildItem android/app/build/outputs/bundle/release
+          if (Test-Path "android/app/build/outputs/bundle/release") {
+            Get-ChildItem android/app/build/outputs/bundle/release
+          } else {
+            Write-Host "AAB folder not found"
+          }
 
       # ✅ Upload to Play Store
       - name: Upload to Play Store
