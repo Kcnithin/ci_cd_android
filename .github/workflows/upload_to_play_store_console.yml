@@ -14,13 +14,13 @@ jobs:
 
     steps:
       # ----------------------------------------------
-      # Checkout
+      # Checkout Code
       # ----------------------------------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       # ----------------------------------------------
-      # Java
+      # Java & Android SDK
       # ----------------------------------------------
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -28,9 +28,6 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # ----------------------------------------------
-      # Android SDK
-      # ----------------------------------------------
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
@@ -42,60 +39,37 @@ jobs:
           sdkmanager --update
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-36"
-          sdkmanager "build-tools;36.0.0" || true
+          sdkmanager "build-tools;36.0.0"
 
       # ----------------------------------------------
-      # Google Auth (for Play API)
-      # ----------------------------------------------
-      - name: Authenticate with Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.PLAYSTORE_JSON }}
-
-      # ----------------------------------------------
-      # Get next versionCode
-      # ----------------------------------------------
-      - name: Get Next Version Code
-        id: next_version
-        run: |
-          EDIT_RESPONSE=$(curl -s -X POST \
-            -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
-            -H "Content-Type: application/json" \
-            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.cicd.seeroo_sample/edits" \
-            -d '{}')
-
-          EDIT_ID=$(echo $EDIT_RESPONSE | jq -r '.id')
-
-          TRACK_RESPONSE=$(curl -s \
-            -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
-            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.cicd.seeroo_sample/edits/$EDIT_ID/tracks/internal")
-
-          VERSION_CODE=$(echo $TRACK_RESPONSE | jq -r '.releases[0].versionCodes[0]')
-
-          if [ "$VERSION_CODE" = "null" ] || [ -z "$VERSION_CODE" ]; then
-            VERSION_CODE=1
-          else
-            VERSION_CODE=$((VERSION_CODE + 1))
-          fi
-
-          echo "Next version code: $VERSION_CODE"
-          echo "nextVersionCode=$VERSION_CODE" >> $GITHUB_OUTPUT
-
-      # ----------------------------------------------
-      # Decode Keystore
+      # Decode Keystore (correct location)
       # ----------------------------------------------
       - name: Decode Keystore
         run: |
-          mkdir -p keystores
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystores/cicd-keystore.jks
+          mkdir -p app/keystores
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystores/cicd-keystore.jks
 
       # ----------------------------------------------
       # Setup Play Store JSON
       # ----------------------------------------------
       - name: Setup Play Store JSON
+        env:
+          PLAY_STORE_JSON: ${{ secrets.PLAYSTORE_JSON}}
         run: |
-          echo '${{ secrets.PLAYSTORE_JSON }}' > play-store-key.json
-          cat play-store-key.json | jq .
+          # Try to base64 decode, if it's invalid base64 or results in invalid JSON, fall back to plain text
+          if echo "$PLAY_STORE_JSON" | base64 --decode > play-store-key.json 2>/dev/null && jq -e . play-store-key.json >/dev/null 2>&1; then
+            echo "✅ Decoded PLAYSTORE_JSONfrom base64 successfully."
+          else
+            echo "⚠️ PLAYSTORE_JSONis not valid base64. Treating as plain text JSON."
+            echo "$PLAY_STORE_JSON" | tr -d '\000' | sed 's/\r$//' > play-store-key.json
+          fi
+
+          echo "Validating play-store-key.json..."
+          if ! jq -e . play-store-key.json >/dev/null 2>&1; then
+            echo "❌ JSON is invalid or empty! Please verify your GitHub secret: PLAY_STORE_JSON_KEY."
+            exit 1
+          fi
+          echo "✅ JSON is valid and ready."
 
       # ----------------------------------------------
       # Gradle Setup
@@ -107,42 +81,41 @@ jobs:
         run: chmod +x ./gradlew
 
       # ----------------------------------------------
-      # Clean
+      # Clean & Build Release AAB
       # ----------------------------------------------
       - name: Clean
-        run: ./gradlew clean
+        run: ./gradlew clean --stacktrace
         env:
-          KEYSTORE_PATH: keystores/cicd-keystore.jks
+          KEYSTORE_PATH: keystores/cicd-keystore.jks   # FIXED
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # ----------------------------------------------
-      # Build AAB
-      # ----------------------------------------------
       - name: Build Release AAB
         run: ./gradlew bundleRelease --stacktrace --info
         env:
-          KEYSTORE_PATH: keystores/cicd-keystore.jks
+          KEYSTORE_PATH: keystores/cicd-keystore.jks   # FIXED
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           VERSION_CODE: ${{ steps.next_version.outputs.nextVersionCode }}
 
       # ----------------------------------------------
-      # Verify
+      # Verify AAB Output
       # ----------------------------------------------
       - name: Ensure AAB exists
-        run: ls -R app/build/outputs/bundle/release
+        run: |
+          echo "Generated AAB files:"
+          ls -R app/build/outputs/bundle/release
 
       # ----------------------------------------------
-      # Upload
+      # Upload to Google Play
       # ----------------------------------------------
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
-          serviceAccountJson: play-store-key.json
+          serviceAccountJson: ${{ github.workspace }}/play-store-key.json
           packageName: com.cicd.seeroo_sample
-          releaseFiles: app/build/outputs/bundle/release/*.aab
+          releaseFiles: app/build/outputs/bundle/release/**/*.aab   # FIXED
           track: ${{ github.event.inputs.track }}
           status: completed
