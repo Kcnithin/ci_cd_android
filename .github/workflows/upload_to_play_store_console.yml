@@ -53,15 +53,15 @@ jobs:
         run: |
           echo "VERSION_CODE=2" >> $env:GITHUB_ENV
 
-      # ✅ Clean (FIXED)
+      # ✅ Clean (FINAL FIX)
       - name: Clean
         working-directory: android
-        run: gradlew.bat clean
+        run: .\gradlew.bat clean
 
-      # ✅ Build (FIXED)
+      # ✅ Build (FINAL FIX)
       - name: Build Release AAB
         working-directory: android
-        run: gradlew.bat bundleRelease --stacktrace --debug
+        run: .\gradlew.bat bundleRelease --stacktrace --debug
         env:
           VERSION_CODE: ${{ env.VERSION_CODE }}
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
