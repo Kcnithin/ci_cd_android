@@ -6,50 +6,47 @@ plugins {
 
 android {
     namespace = "com.cicd.seeroo_sample"
-    compileSdk {
-        version = release(36)
-    }
+
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.cicd.seeroo_sample"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
+
+        val versionCodeFromEnv = System.getenv("VERSION_CODE")?.toIntOrNull()
+        versionCode = versionCodeFromEnv ?: 1
+
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildTypes {
-        defaultConfig {
-            val versionCodeFromEnv = System.getenv("VERSION_CODE")?.toIntOrNull()
-            versionCode = versionCodeFromEnv ?: 1
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
         }
-
-        signingConfigs {
-            create("release") {
-                storeFile = file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
-            }
-        }
-
-        buildTypes {
-            getByName("release") {
-                signingConfig = signingConfigs.getByName("release")
-                isMinifyEnabled = false
-            }
-        }
-
     }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
         compose = true
     }

@@ -22,11 +22,12 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
-      # ✅ Decode Keystore (Windows safe)
+      # ✅ Decode Keystore (FIXED PATH)
       - name: Decode Keystore
         shell: pwsh
         run: |
-          [IO.File]::WriteAllBytes("app/keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
+          New-Item -ItemType Directory -Force -Path android/app
+          [IO.File]::WriteAllBytes("android/app/keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
 
       # ✅ Decode Play Store JSON
       - name: Decode Play Store JSON
@@ -40,44 +41,33 @@ jobs:
         run: |
           echo "sdk.dir=$env:ANDROID_HOME" > local.properties
 
-      # ✅ Ensure gradlew runs
-      - name: Grant execute permission
-        run: chmod +x gradlew
+      # ❌ REMOVE chmod (not needed on Windows)
 
-      # ✅ Verify keystore exists (debug)
+      # ✅ Verify keystore exists
       - name: Verify keystore
         shell: pwsh
         run: |
-          Get-ChildItem app
+          Get-ChildItem android/app
 
-      # ✅ Get latest versionCode from Play Store
-      - name: Get latest version code
-        id: version
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJson: play-store-key.json
-          packageName: com.cicd.seeroo_sample
-          track: internal
-          status: draft
-        continue-on-error: true
+      # ❌ REMOVE this step (causes confusion + unnecessary API call)
+      # - name: Get latest version code
 
-      # ✅ Increment versionCode (Windows safe + fallback)
-      - name: Increment version code
+      # ✅ Set versionCode safely
+      - name: Set version code
         shell: pwsh
         run: |
-          $versionCode = "${{ steps.version.outputs.versionCode }}"
-          if (-not $versionCode) {
-            $versionCode = 1
-          }
-          $newVersionCode = [int]$versionCode + 1
-          echo "VERSION_CODE=$newVersionCode" >> $env:GITHUB_ENV
+          echo "VERSION_CODE=2" >> $env:GITHUB_ENV
 
-      # ✅ Build AAB (with correct keystore path)
+      # ✅ Clean build (IMPORTANT)
+      - name: Clean
+        run: ./gradlew clean
+
+      # ✅ Build AAB
       - name: Build Release AAB
-        run: ./gradlew bundleRelease --stacktrace
+        run: ./gradlew bundleRelease --stacktrace --info
         env:
           VERSION_CODE: ${{ env.VERSION_CODE }}
-          KEYSTORE_PATH: ${{ github.workspace }}/app/keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -86,14 +76,14 @@ jobs:
       - name: Verify AAB
         shell: pwsh
         run: |
-          Get-ChildItem app/build/outputs/bundle/release
+          Get-ChildItem android/app/build/outputs/bundle/release
 
-      # ✅ Upload to Play Store
+      # ✅ Upload to Play Store (FIXED PATH)
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJson: play-store-key.json
           packageName: com.cicd.seeroo_sample
-          releaseFiles: app/build/outputs/bundle/release/*.aab
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           track: ${{ github.event.inputs.track }}
           status: completed
