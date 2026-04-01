@@ -9,12 +9,12 @@ plugins {
 android {
     namespace = "com.cicd.seeroo_sample"
 
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.cicd.seeroo_sample"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
 
         val versionCodeFromEnv = System.getenv("VERSION_CODE")?.toIntOrNull()
         versionCode = versionCodeFromEnv ?: 1
@@ -31,7 +31,7 @@ android {
             val envKeyPassword = System.getenv("KEY_PASSWORD")
 
             if (!envStoreFile.isNullOrEmpty()) {
-                // Running on CI
+                // CI (GitHub Actions)
                 storeFile = file(envStoreFile)
                 storePassword = envStorePassword
                 keyAlias = envKeyAlias
@@ -54,8 +54,8 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
         }
     }
 
