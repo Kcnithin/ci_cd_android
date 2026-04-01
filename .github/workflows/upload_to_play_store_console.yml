@@ -101,7 +101,7 @@ jobs:
       # 9. BUILD RELEASE AAB
       # -----------------------------
       - name: Build Release AAB
-        run: ./gradlew bundleRelease --stacktrace --debug
+        run: ./gradlew bundleRelease --stacktrace
         env:
           KEYSTORE_PATH: keystores/cicd-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
