@@ -22,7 +22,7 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
-      # ✅ Decode Keystore (FIXED PATH)
+      # ✅ Decode Keystore
       - name: Decode Keystore
         shell: pwsh
         run: |
@@ -35,13 +35,18 @@ jobs:
         run: |
           [IO.File]::WriteAllBytes("play-store-key.json", [Convert]::FromBase64String("${{ secrets.PLAY_STORE_JSON_KEY }}"))
 
-      # ✅ Create local.properties
+      # ✅ FIXED: Create local.properties (CRITICAL CHANGE)
       - name: Create local.properties
         shell: pwsh
         run: |
-          echo "sdk.dir=$env:ANDROID_HOME" > local.properties
+          $sdkPath = $env:ANDROID_HOME -replace '\\', '/'
+          echo "sdk.dir=$sdkPath" > local.properties
 
-      # ❌ REMOVE chmod (not needed on Windows)
+      # ✅ Debug SDK path (optional but useful)
+      - name: Verify SDK path
+        shell: pwsh
+        run: |
+          Get-Content local.properties
 
       # ✅ Verify keystore exists
       - name: Verify keystore
@@ -49,16 +54,13 @@ jobs:
         run: |
           Get-ChildItem android/app
 
-      # ❌ REMOVE this step (causes confusion + unnecessary API call)
-      # - name: Get latest version code
-
-      # ✅ Set versionCode safely
+      # ✅ Set versionCode
       - name: Set version code
         shell: pwsh
         run: |
           echo "VERSION_CODE=2" >> $env:GITHUB_ENV
 
-      # ✅ Clean build (IMPORTANT)
+      # ✅ Clean build
       - name: Clean
         run: ./gradlew clean
 
@@ -78,7 +80,7 @@ jobs:
         run: |
           Get-ChildItem android/app/build/outputs/bundle/release
 
-      # ✅ Upload to Play Store (FIXED PATH)
+      # ✅ Upload to Play Store
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
