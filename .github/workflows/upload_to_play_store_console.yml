@@ -50,7 +50,7 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystores/cicd-keystore.jks
 
       # ----------------------------------------------
-      # Setup Play Store JSON
+      # Setup Play Store JSON Key
       # ----------------------------------------------
       - name: Setup Play Store JSON
         env:
@@ -70,15 +70,16 @@ jobs:
         run: sudo gem install fastlane -N
 
       # ----------------------------------------------
-      # Fetch current Play Store versionCode
+      # Fetch REAL Highest Version Code (Fixed)
       # ----------------------------------------------
       - name: Fetch versionCode from Play Store
         id: fetch_version
         run: |
-          echo "Fetching versionCode..."
+          echo "Fetching real highest versionCode from ALL tracks..."
+
           JSON_KEY="$GITHUB_WORKSPACE/play-store-key.json"
 
-          VERSION_CODE=$(fastlane supply \
+          fastlane supply \
             --package_name com.cicd.seeroo_sample \
             --json_key $JSON_KEY \
             --skip_upload_metadata \
@@ -87,7 +88,10 @@ jobs:
             --skip_upload_apk \
             --skip_upload_aab \
             --format json \
-            --print_current_version | jq '.tracks[].releases[].versionCodes[0]' | sort -nr | head -1)
+            --print_current_version > supply_output.json
+
+          # Extract ALL version codes from ALL tracks
+          VERSION_CODE=$(jq '[.. | .versionCodes? // empty] | flatten | max' supply_output.json)
 
           if [ -z "$VERSION_CODE" ] || [ "$VERSION_CODE" = "null" ]; then
             VERSION_CODE=1
@@ -95,7 +99,9 @@ jobs:
 
           NEW_VERSION_CODE=$((VERSION_CODE + 1))
 
-          echo "New Version Code: $NEW_VERSION_CODE"
+          echo "Latest Play Store versionCode = $VERSION_CODE"
+          echo "New versionCode for CI = $NEW_VERSION_CODE"
+
           echo "VERSION_CODE=$NEW_VERSION_CODE" >> $GITHUB_ENV
 
       # ----------------------------------------------
@@ -111,8 +117,9 @@ jobs:
       # Build AAB
       # ----------------------------------------------
       - name: Build Release AAB
-        run: ./gradlew bundleRelease --info -PversionCode=$VERSION_CODE
+        run: ./gradlew bundleRelease --info
         env:
+          VERSION_CODE: ${{ env.VERSION_CODE }}
           KEYSTORE_PATH: keystores/cicd-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -122,7 +129,9 @@ jobs:
       # Verify AAB
       # ----------------------------------------------
       - name: Ensure AAB exists
-        run: ls -R app/build/outputs/bundle/release
+        run: |
+          echo "Generated AAB files:"
+          ls -R app/build/outputs/bundle/release
 
       # ----------------------------------------------
       # Upload to Google Play
