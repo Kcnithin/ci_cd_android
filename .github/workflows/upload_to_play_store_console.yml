@@ -32,16 +32,20 @@ jobs:
           sdkmanager --licenses | Out-Null
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
+      # Keystore decode works fine in PowerShell
       - name: Decode Keystore
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path keystores
           [IO.File]::WriteAllBytes("keystores/cicd-keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
 
-      - name: Decode Play Store JSON
-        shell: pwsh
+      # 🔥 IMPORTANT FIX: Decode JSON using bash, not PowerShell
+      - name: Decode Play Store JSON (FIXED)
+        shell: bash
         run: |
-          [IO.File]::WriteAllBytes("play-store-key.json", [Convert]::FromBase64String("${{ secrets.PLAY_STORE_JSON_KEY }}"))
+          echo "${PLAY_STORE_JSON_KEY}" | base64 --decode > play-store-key.json
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
 
       - name: Create local.properties
         shell: pwsh
