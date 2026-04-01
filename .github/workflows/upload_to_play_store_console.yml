@@ -13,26 +13,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout
+      # ----------------------------------------------
+      # Checkout Code
+      # ----------------------------------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Java 17
+      # ----------------------------------------------
+      # Java & Android SDK
+      # ----------------------------------------------
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Accept licenses
       - name: Accept Android Licenses
         run: yes | sdkmanager --licenses
 
-      # Install required SDKs
       - name: Install SDK components
         run: |
           sdkmanager --update
@@ -40,38 +41,54 @@ jobs:
           sdkmanager "platforms;android-36"
           sdkmanager "build-tools;36.0.0"
 
-      # Decode keystore
+      # ----------------------------------------------
+      # Decode Keystore
+      # ----------------------------------------------
       - name: Decode Keystore
         run: |
           mkdir -p app/keystores
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystores/cicd-keystore.jks
 
+      # ----------------------------------------------
       # Decode Play Store JSON
+      # ----------------------------------------------
       - name: Decode Play Store JSON
         run: |
           echo "${{ secrets.PLAY_STORE_JSON_KEY }}" | base64 --decode > play-store-key.json
 
-      # ✅ NEW: Validate Play Store JSON
+      # ----------------------------------------------
+      # Clean JSON (Fix CRLF, null bytes, formatting issues)
+      # ----------------------------------------------
+      - name: Clean Play Store JSON
+        run: |
+          tr -d '\000' < play-store-key.json | sed 's/\r$//' > clean.json
+          mv clean.json play-store-key.json
+
+      # ----------------------------------------------
+      # Validate Play Store JSON Strictly
+      # ----------------------------------------------
       - name: Validate Play Store JSON
         run: |
           echo "Validating play-store-key.json..."
-          if ! cat play-store-key.json | jq empty; then
-            echo "❌ ERROR: play-store-key.json is invalid or empty."
-            echo "Secret PLAY_STORE_JSON_KEY is probably corrupted."
-            exit 1
-          fi
-          echo "✅ Play Store JSON is valid."
+          cat play-store-key.json | jq empty
+          echo "✅ JSON is valid and clean."
 
-      # Create local.properties
+      # Optional Debug (if needed)
+      # - name: Debug JSON bytes
+      #   run: xxd play-store-key.json
+
+      # ----------------------------------------------
+      # Gradle Setup
+      # ----------------------------------------------
       - name: Create local.properties
-        run: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
-      # Make gradlew executable
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Clean build
+      # ----------------------------------------------
+      # Clean & Build Release AAB
+      # ----------------------------------------------
       - name: Clean
         run: ./gradlew clean --stacktrace
         env:
@@ -80,7 +97,6 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # Build AAB
       - name: Build Release AAB
         run: ./gradlew bundleRelease --stacktrace --info
         env:
@@ -89,17 +105,21 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # Verify output
+      # ----------------------------------------------
+      # Verify AAB Output
+      # ----------------------------------------------
       - name: Ensure AAB exists
         run: |
           echo "Generated AAB files:"
           ls -R app/build/outputs/bundle/release
 
-      # Upload to Play Store
+      # ----------------------------------------------
+      # Upload to Google Play
+      # ----------------------------------------------
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
-          serviceAccountJson: play-store-key.json
+          serviceAccountJson: ${{ github.workspace }}/play-store-key.json
           packageName: com.cicd.seeroo_sample
           releaseFiles: app/build/outputs/bundle/release/*.aab
           track: ${{ github.event.inputs.track }}
