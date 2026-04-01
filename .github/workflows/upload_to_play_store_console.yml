@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
 
@@ -23,57 +23,38 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sudo apt-get update && sudo apt-get install -y android-sdk
 
-      - name: Install SDK components
-        shell: pwsh
-        run: |
-          sdkmanager --licenses | Out-Null
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses
 
-      # Keystore decode works fine in PowerShell
+      - name: Install build tools
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
       - name: Decode Keystore
-        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path keystores
-          [IO.File]::WriteAllBytes("keystores/cicd-keystore.jks", [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}"))
+          mkdir -p keystores
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystores/cicd-keystore.jks
 
-      # 🔥 IMPORTANT FIX: Decode JSON using bash, not PowerShell
-      - name: Decode Play Store JSON (FIXED)
-        shell: bash
+      - name: Decode Play Store JSON
         run: |
-          echo "${PLAY_STORE_JSON_KEY}" | base64 --decode > play-store-key.json
-        env:
-          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          echo "${{ secrets.PLAY_STORE_JSON_KEY }}" | base64 --decode > play-store-key.json
 
       - name: Create local.properties
-        shell: pwsh
         run: |
-          $sdkPath = $env:ANDROID_SDK_ROOT -replace '\\', '/'
-          echo "sdk.dir=$sdkPath" > local.properties
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
       - name: Clean
-        run: .\gradlew.bat clean
+        run: ./gradlew clean
 
       - name: Build Release AAB
-        run: .\gradlew.bat bundleRelease --stacktrace --debug
+        run: ./gradlew bundleRelease --stacktrace --debug
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/keystores/cicd-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Ensure AAB exists
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem app/build -Recurse -Filter *.aab -ErrorAction SilentlyContinue
-          if (-not $files) {
-            Write-Error "AAB not generated. Build failed."
-            exit 1
-          } else {
-            $files
-          }
 
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
