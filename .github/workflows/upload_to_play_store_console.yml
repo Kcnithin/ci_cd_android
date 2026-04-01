@@ -14,7 +14,7 @@ jobs:
 
     steps:
       # ----------------------------------------------
-      # Checkout Code
+      # Checkout
       # ----------------------------------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -38,11 +38,11 @@ jobs:
         run: |
           sdkmanager --update
           sdkmanager "platform-tools"
-          sdkmanager "platforms;android-36"
-          sdkmanager "build-tools;36.0.0"
+          sdkmanager "platforms;android-34"
+          sdkmanager "build-tools;34.0.0"
 
       # ----------------------------------------------
-      # Decode Keystore (correct location)
+      # Decode Keystore
       # ----------------------------------------------
       - name: Decode Keystore
         run: |
@@ -54,22 +54,49 @@ jobs:
       # ----------------------------------------------
       - name: Setup Play Store JSON
         env:
-          PLAY_STORE_JSON: ${{ secrets.PLAYSTORE_JSON}}
+          PLAY_STORE_JSON: ${{ secrets.PLAYSTORE_JSON }}
         run: |
-          # Try to base64 decode, if it's invalid base64 or results in invalid JSON, fall back to plain text
-          if echo "$PLAY_STORE_JSON" | base64 --decode > play-store-key.json 2>/dev/null && jq -e . play-store-key.json >/dev/null 2>&1; then
-            echo "✅ Decoded PLAYSTORE_JSONfrom base64 successfully."
+          if echo "$PLAY_STORE_JSON" | base64 --decode > play-store-key.json 2>/dev/null \
+            && jq -e . play-store-key.json >/dev/null 2>&1; then
+            echo "Decoded JSON from base64."
           else
-            echo "⚠️ PLAYSTORE_JSONis not valid base64. Treating as plain text JSON."
-            echo "$PLAY_STORE_JSON" | tr -d '\000' | sed 's/\r$//' > play-store-key.json
+            echo "$PLAY_STORE_JSON" > play-store-key.json
           fi
 
-          echo "Validating play-store-key.json..."
-          if ! jq -e . play-store-key.json >/dev/null 2>&1; then
-            echo "❌ JSON is invalid or empty! Please verify your GitHub secret: PLAY_STORE_JSON_KEY."
-            exit 1
+      # ----------------------------------------------
+      # Install Fastlane
+      # ----------------------------------------------
+      - name: Install Fastlane
+        run: sudo gem install fastlane -N
+
+      # ----------------------------------------------
+      # Fetch current Play Store versionCode
+      # ----------------------------------------------
+      - name: Fetch versionCode from Play Store
+        id: fetch_version
+        run: |
+          echo "Fetching versionCode..."
+          JSON_KEY="$GITHUB_WORKSPACE/play-store-key.json"
+
+          VERSION_CODE=$(fastlane supply \
+            --package_name com.cicd.seeroo_sample \
+            --json_key $JSON_KEY \
+            --skip_upload_metadata \
+            --skip_upload_images \
+            --skip_upload_screenshots \
+            --skip_upload_apk \
+            --skip_upload_aab \
+            --format json \
+            --print_current_version | jq '.tracks[].releases[].versionCodes[0]' | sort -nr | head -1)
+
+          if [ -z "$VERSION_CODE" ] || [ "$VERSION_CODE" = "null" ]; then
+            VERSION_CODE=1
           fi
-          echo "✅ JSON is valid and ready."
+
+          NEW_VERSION_CODE=$((VERSION_CODE + 1))
+
+          echo "New Version Code: $NEW_VERSION_CODE"
+          echo "VERSION_CODE=$NEW_VERSION_CODE" >> $GITHUB_ENV
 
       # ----------------------------------------------
       # Gradle Setup
@@ -81,32 +108,21 @@ jobs:
         run: chmod +x ./gradlew
 
       # ----------------------------------------------
-      # Clean & Build Release AAB
+      # Build AAB
       # ----------------------------------------------
-      - name: Clean
-        run: ./gradlew clean --stacktrace
-        env:
-          KEYSTORE_PATH: keystores/cicd-keystore.jks   # FIXED
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
       - name: Build Release AAB
-        run: ./gradlew bundleRelease --stacktrace --info
+        run: ./gradlew bundleRelease --info -PversionCode=$VERSION_CODE
         env:
-          KEYSTORE_PATH: keystores/cicd-keystore.jks   # FIXED
+          KEYSTORE_PATH: keystores/cicd-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          VERSION_CODE: ${{ 2 }}
 
       # ----------------------------------------------
-      # Verify AAB Output
+      # Verify AAB
       # ----------------------------------------------
       - name: Ensure AAB exists
-        run: |
-          echo "Generated AAB files:"
-          ls -R app/build/outputs/bundle/release
+        run: ls -R app/build/outputs/bundle/release
 
       # ----------------------------------------------
       # Upload to Google Play
@@ -116,6 +132,6 @@ jobs:
         with:
           serviceAccountJson: ${{ github.workspace }}/play-store-key.json
           packageName: com.cicd.seeroo_sample
-          releaseFiles: app/build/outputs/bundle/release/**/*.aab   # FIXED
+          releaseFiles: app/build/outputs/bundle/release/**/*.aab
           track: ${{ github.event.inputs.track }}
           status: completed

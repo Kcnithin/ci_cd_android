@@ -16,10 +16,14 @@ android {
         minSdk = 24
         targetSdk = 36
 
-        val versionCodeFromEnv = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
-        versionCode = versionCodeFromEnv
+        // --- Version Code from GitHub Actions ---
+        val ciVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull()
+        val finalVersionCode = ciVersionCode ?: 1
+        versionCode = finalVersionCode
 
-        versionName = "1.0.$versionCodeFromEnv"
+        // --- Version Name Auto Generate ---
+        versionName = "1.0.$finalVersionCode"
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
