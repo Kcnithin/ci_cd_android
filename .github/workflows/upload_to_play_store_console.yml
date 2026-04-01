@@ -98,7 +98,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          VERSION_CODE: ${{ steps.next_version.outputs.nextVersionCode }}
+          VERSION_CODE: ${{ 2 }}
 
       # ----------------------------------------------
       # Verify AAB Output
