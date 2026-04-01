@@ -24,10 +24,15 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # ✅ Install Android SDK components (CRITICAL FIX)
-      - name: Install Android SDK
+      # ✅ Install Android SDK (PROPER FIX)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ✅ Accept licenses + install required SDK
+      - name: Install SDK components
         shell: pwsh
         run: |
+          sdkmanager --licenses | Out-Null
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       # ✅ Decode Keystore
@@ -43,11 +48,11 @@ jobs:
         run: |
           [IO.File]::WriteAllBytes("play-store-key.json", [Convert]::FromBase64String("${{ secrets.PLAY_STORE_JSON_KEY }}"))
 
-      # ✅ FIXED: local.properties (Windows-safe)
+      # ✅ FIXED SDK path
       - name: Create local.properties
         shell: pwsh
         run: |
-          $sdkPath = $env:ANDROID_HOME -replace '\\', '/'
+          $sdkPath = $env:ANDROID_SDK_ROOT -replace '\\', '/'
           echo "sdk.dir=$sdkPath" > local.properties
 
       # ✅ Debug SDK path
@@ -56,7 +61,7 @@ jobs:
         run: |
           Get-Content local.properties
 
-      # ✅ Verify keystore exists
+      # ✅ Verify keystore
       - name: Verify keystore
         shell: pwsh
         run: |
@@ -72,7 +77,7 @@ jobs:
       - name: Clean
         run: ./gradlew clean
 
-      # ✅ Build AAB (FULL DEBUG)
+      # ✅ Build AAB
       - name: Build Release AAB
         run: ./gradlew bundleRelease --stacktrace --debug
         env:
@@ -82,7 +87,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # ✅ Debug all build outputs (VERY IMPORTANT)
+      # ✅ Debug build output
       - name: Debug Build Folder
         shell: pwsh
         run: |
@@ -92,7 +97,7 @@ jobs:
             Write-Host "Build folder not found"
           }
 
-      # ✅ Verify AAB safely (no crash)
+      # ✅ Verify AAB
       - name: Verify AAB
         shell: pwsh
         run: |
@@ -102,7 +107,7 @@ jobs:
             Write-Host "AAB folder not found"
           }
 
-      # ✅ Upload to Play Store
+      # ✅ Upload
       - name: Upload to Play Store
         uses: r0adkll/upload-google-play@v1
         with:
