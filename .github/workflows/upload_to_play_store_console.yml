@@ -24,15 +24,15 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Android SDK (clean + stable)
+      # Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Accept licenses FIRST ✅
+      # Accept licenses
       - name: Accept Android Licenses
         run: yes | sdkmanager --licenses
 
-      # Install required SDKs ✅
+      # Install required SDKs
       - name: Install SDK components
         run: |
           sdkmanager --update
@@ -51,7 +51,18 @@ jobs:
         run: |
           echo "${{ secrets.PLAY_STORE_JSON_KEY }}" | base64 --decode > play-store-key.json
 
-      # local.properties (important for Gradle)
+      # ✅ NEW: Validate Play Store JSON
+      - name: Validate Play Store JSON
+        run: |
+          echo "Validating play-store-key.json..."
+          if ! cat play-store-key.json | jq empty; then
+            echo "❌ ERROR: play-store-key.json is invalid or empty."
+            echo "Secret PLAY_STORE_JSON_KEY is probably corrupted."
+            exit 1
+          fi
+          echo "✅ Play Store JSON is valid."
+
+      # Create local.properties
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
