@@ -50,28 +50,26 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystores/cicd-keystore.jks
 
       # ----------------------------------------------
-      # Decode Play Store JSON
+      # Setup Play Store JSON
       # ----------------------------------------------
-      - name: Decode Play Store JSON
+      - name: Setup Play Store JSON
+        env:
+          PLAY_STORE_JSON: ${{ secrets.PLAY_STORE_JSON_KEY }}
         run: |
-          echo "${{ secrets.PLAY_STORE_JSON_KEY }}" | base64 --decode > play-store-key.json
+          # Try to base64 decode, if it's invalid base64 or results in invalid JSON, fall back to plain text
+          if echo "$PLAY_STORE_JSON" | base64 --decode > play-store-key.json 2>/dev/null && jq -e . play-store-key.json >/dev/null 2>&1; then
+            echo "✅ Decoded PLAY_STORE_JSON_KEY from base64 successfully."
+          else
+            echo "⚠️ PLAY_STORE_JSON_KEY is not valid base64. Treating as plain text JSON."
+            echo "$PLAY_STORE_JSON" | tr -d '\000' | sed 's/\r$//' > play-store-key.json
+          fi
 
-      # ----------------------------------------------
-      # Clean JSON
-      # ----------------------------------------------
-      - name: Clean Play Store JSON
-        run: |
-          tr -d '\000' < play-store-key.json | sed 's/\r$//' > clean.json
-          mv clean.json play-store-key.json
-
-      # ----------------------------------------------
-      # Validate Play Store JSON
-      # ----------------------------------------------
-      - name: Validate Play Store JSON
-        run: |
           echo "Validating play-store-key.json..."
-          cat play-store-key.json | jq empty
-          echo "✅ JSON is valid and clean."
+          if ! jq -e . play-store-key.json >/dev/null 2>&1; then
+            echo "❌ JSON is invalid or empty! Please verify your GitHub secret: PLAY_STORE_JSON_KEY."
+            exit 1
+          fi
+          echo "✅ JSON is valid and ready."
 
       # ----------------------------------------------
       # Gradle Setup
