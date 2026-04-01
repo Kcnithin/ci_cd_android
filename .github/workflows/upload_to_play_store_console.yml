@@ -54,13 +54,13 @@ jobs:
       # ----------------------------------------------
       - name: Setup Play Store JSON
         env:
-          PLAY_STORE_JSON: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          PLAY_STORE_JSON: ${{ secrets.PLAYSTORE_JSON}}
         run: |
           # Try to base64 decode, if it's invalid base64 or results in invalid JSON, fall back to plain text
           if echo "$PLAY_STORE_JSON" | base64 --decode > play-store-key.json 2>/dev/null && jq -e . play-store-key.json >/dev/null 2>&1; then
-            echo "✅ Decoded PLAY_STORE_JSON_KEY from base64 successfully."
+            echo "✅ Decoded PLAYSTORE_JSONfrom base64 successfully."
           else
-            echo "⚠️ PLAY_STORE_JSON_KEY is not valid base64. Treating as plain text JSON."
+            echo "⚠️ PLAYSTORE_JSONis not valid base64. Treating as plain text JSON."
             echo "$PLAY_STORE_JSON" | tr -d '\000' | sed 's/\r$//' > play-store-key.json
           fi
 
