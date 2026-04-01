@@ -72,6 +72,16 @@ jobs:
           echo "✅ JSON is valid and ready."
 
       # ----------------------------------------------
+      # Get Next Version Code from Google Play
+      # ----------------------------------------------
+      - name: Get Next Version Code
+        id: next_version
+        uses: mmachado53/google-play-next-version-code@v0.0.4
+        with:
+          serviceAccountJsonFile: play-store-key.json
+          packageName: com.cicd.seeroo_sample
+
+      # ----------------------------------------------
       # Gradle Setup
       # ----------------------------------------------
       - name: Create local.properties
@@ -98,6 +108,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_CODE: ${{ steps.next_version.outputs.nextVersionCode }}
 
       # ----------------------------------------------
       # Verify AAB Output
